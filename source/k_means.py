@@ -10,6 +10,15 @@ from PIL import Image
 from load.load_mnist import load
 
 
+def mask_one_hot(data, centers):
+    distances = np.array([np.linalg.norm(data - center, axis=1) for center in centers]).transpose()
+    mask = np.argmin(distances, axis=1)
+    masks = np.zeros([len(data), 10])
+    for i in range(len(data)):
+        masks[i, mask[i]] = 1
+    return masks
+
+
 def e_step(data, centers):
     # data[masks[arg_data]]
     distances = np.array([np.linalg.norm(data - center, axis=1) for center in centers]).transpose()
@@ -133,6 +142,7 @@ if __name__ == "__main__":
 
     _scores_df = pd.DataFrame()
     for _seed in range(100):
+        print("seed: ", _seed)
         _file_path = os.path.dirname(os.path.abspath(__file__))
         _save_dir = _file_path + "/data/seed_" + str(_seed)
 
