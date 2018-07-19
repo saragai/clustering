@@ -29,8 +29,21 @@ if __name__ == "__main__":
     train_labels = _data["train_labels"]
 
     np.random.seed(1)
-    _centers = np.random.rand(10, 784)
-    # _centers = [np.random.randint(0, len(train_images))]
+    # _centers = np.random.rand(10, 784)
+    _center_idx = [np.random.randint(0, len(train_images))]
+
+    for _ in range(1, 10):
+        _sqr_distance = np.array([np.sum(((train_images - train_images[idx]) ** 2), axis=1) for idx in _center_idx])
+        nearest_sqr_distances = np.min(_sqr_distance.transpose(), axis=1)
+        sum_sqr_distances = np.sum(nearest_sqr_distances)
+        print(nearest_sqr_distances.shape)
+        print(sum_sqr_distances.shape)
+        _center_idx.append(np.random.choice(len(train_images), size=1, p=nearest_sqr_distances/sum_sqr_distances))
+
+    _center_idx = np.array(_center_idx)
+    print("center_idx:\n", _center_idx)
+    print("center_label\n", train_labels[_center_idx])
+    _centers = train_images[_center_idx]
 
     step = 0
     while step < 100:
