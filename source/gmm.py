@@ -45,7 +45,7 @@ def m_step(data, burden_rate, K):
 
 
 def gmm(data, seed, save_dir, k):
-    centers = k_means(data, seed=seed, save_dir=save_dir, k=k)
+    centers = k_means(data, seed=seed, save_dir=save_dir, k=k, is_center=True)
     burden_rate = mask_one_hot(data, centers, k=k)
     print("B_shape0", burden_rate.shape)
     pi, mu, sigma = m_step(data.T, burden_rate, k)
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         _mask = np.argmax(_burden_rate, axis=1)
         _masks = np.array([_mask == mi for mi in range(_k)])
 
-        draw_heatmap(train_labels, _masks, seed=_seed, save_dir=_save_dir, k=_k)
+        draw_heatmap(train_labels, _masks, seed=_seed, save_dir=_save_dir, k=_k, filename="/gmm_heatmap.png")
         _score = entropy_score(train_labels, _masks, k=_k)
         _score_df = pd.DataFrame({
             'seed': [_seed],

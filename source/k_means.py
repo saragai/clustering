@@ -51,7 +51,8 @@ def entropy_score(labels, masks, k=3):
     return np.sum(weight * entropy(result))
 
 
-def draw_heatmap(labels, masks, save_dir="", seed=1, k=3):
+def draw_heatmap(labels, masks, save_dir="", seed=1, k=3, filename="/heatmap.png"):
+    print(masks)
     raw_result = np.array([
         [np.sum(labels[mask] == label)/np.sum(labels == label) for label in range(k)]
         for mask in masks])
@@ -67,7 +68,7 @@ def draw_heatmap(labels, masks, save_dir="", seed=1, k=3):
 
     sns.heatmap(result, ax=ax, cmap=plt.cm.Blues)
 
-    ax.set_title("k-means heat map (seed={})".format(seed))
+    ax.set_title("GMM heat map (seed={})".format(seed))
     ax.set_xlabel("label")
     ax.set_ylabel("cluster")
 
@@ -80,7 +81,7 @@ def draw_heatmap(labels, masks, save_dir="", seed=1, k=3):
     ax.set_xticklabels(range(k), minor=False)
     ax.set_yticklabels([""]*k, minor=False)
 
-    plt.savefig(save_dir + '/heatmap.png')
+    plt.savefig(save_dir + filename)
 
 
 def k_means_pp_init(data, k):
@@ -97,7 +98,7 @@ def k_means_pp_init(data, k):
     return centers
 
 
-def k_means(data, seed=1, save_dir="", k=3):
+def k_means(data, seed=1, save_dir="", k=3, is_center=False):
     np.random.seed(seed)
     save_name = save_dir + "/center.pkl"
     if not os.path.exists(save_dir):
@@ -106,7 +107,10 @@ def k_means(data, seed=1, save_dir="", k=3):
     if os.path.exists(save_name):
         with open(save_name, 'rb') as f:
             centers = pickle.load(f)
-        return centers
+            masks = e_step(data, centers)
+        if is_center:
+            return centers
+        return masks
 
     # centers = np.random.rand(10, 784)
     centers = k_means_pp_init(data, k=k)
@@ -147,9 +151,7 @@ if __name__ == "__main__":
     else:
         _data = load_iris()
         train_data = _data["data"]
-        print(train_data)
         train_labels = _data["target"]
-        print(train_labels)
         _k = 3
 
     _scores_df = pd.DataFrame()
