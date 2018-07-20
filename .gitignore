@@ -105,6 +105,7 @@ venv.bak/
 
 # dataset
 data/
+data_iris/
 
 # editor setting
 .idea/

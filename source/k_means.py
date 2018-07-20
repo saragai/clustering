@@ -8,12 +8,13 @@ import pandas as pd
 import pickle
 from PIL import Image
 from load.load_mnist import load
+from sklearn.datasets import load_iris
 
 
-def mask_one_hot(data, centers):
+def mask_one_hot(data, centers, k=3):
     distances = np.array([np.linalg.norm(data - center, axis=1) for center in centers]).transpose()
     mask = np.argmin(distances, axis=1)
-    masks = np.zeros([len(data), 10])
+    masks = np.zeros([len(data), k])
     for i in range(len(data)):
         masks[i, mask[i]] = 1
     return masks
@@ -41,25 +42,23 @@ def entropy(array):
     return -np.sum(p * log_p, axis=1)
 
 
-def entropy_score(data, labels, centers):
-    masks = e_step(data, centers)
+def entropy_score(labels, masks, k=3):
     result = np.array([
-        [np.sum(labels[mask] == label)/np.sum(labels == label) for label in range(10)]
+        [np.sum(labels[mask] == label)/np.sum(labels == label) for label in range(k)]
         for mask in masks])
     weight = result.sum(axis=1)/result.sum()
 
     return np.sum(weight * entropy(result))
 
 
-def draw_heatmap(data, labels, centers, save_dir="", seed=1):
-    masks = e_step(data, centers)
+def draw_heatmap(labels, masks, save_dir="", seed=1, k=3):
     raw_result = np.array([
-        [np.sum(labels[mask] == label)/np.sum(labels == label) for label in range(10)]
+        [np.sum(labels[mask] == label)/np.sum(labels == label) for label in range(k)]
         for mask in masks])
 
     # sort for figure
     result = np.zeros(raw_result.shape)
-    for label in range(10):
+    for label in range(k):
         idx = np.argmax(raw_result[:, label])
         result[label] = raw_result[idx]
         raw_result[idx] = 0
@@ -78,16 +77,16 @@ def draw_heatmap(data, labels, centers, save_dir="", seed=1):
     # ax.invert_yaxis()
     # ax.xaxis.tick_top()
 
-    ax.set_xticklabels(range(10), minor=False)
-    ax.set_yticklabels([""]*10, minor=False)
+    ax.set_xticklabels(range(k), minor=False)
+    ax.set_yticklabels([""]*k, minor=False)
 
     plt.savefig(save_dir + '/heatmap.png')
 
 
-def k_means_pp_init(data):
+def k_means_pp_init(data, k):
     center_idx = [np.random.randint(0, len(data))]
 
-    for _ in range(1, 10):
+    for _ in range(1, k):
         _sqr_distance = np.array([np.sum(((data - data[idx]) ** 2), axis=1) for idx in center_idx])
         nearest_sqr_distances = np.min(_sqr_distance.transpose(), axis=1)
         sum_sqr_distances = np.sum(nearest_sqr_distances)
@@ -98,7 +97,7 @@ def k_means_pp_init(data):
     return centers
 
 
-def k_means(data, seed=1, save_dir=""):
+def k_means(data, seed=1, save_dir="", k=3):
     np.random.seed(seed)
     save_name = save_dir + "/center.pkl"
     if not os.path.exists(save_dir):
@@ -110,7 +109,8 @@ def k_means(data, seed=1, save_dir=""):
         return centers
 
     # centers = np.random.rand(10, 784)
-    centers = k_means_pp_init(data)
+    centers = k_means_pp_init(data, k=k)
+    masks = e_step(data, centers)
 
     step = 0
     while step < 80:
@@ -121,8 +121,9 @@ def k_means(data, seed=1, save_dir=""):
         done = np.allclose(old_centers, centers)
         if step % 10 == 0 or done:
             for i, center in enumerate(centers):
-                image = np.uint8(center.reshape((28, 28)) * 255)
-                Image.fromarray(image).save(save_dir + '/img_{}_{}.jpg'.format(step, i))
+                if mnist:
+                    image = np.uint8(center.reshape((28, 28)) * 255)
+                    Image.fromarray(image).save(save_dir + '/img_{}_{}.jpg'.format(step, i))
         if done:
             print("Clustering is converged")
             break
@@ -132,26 +133,44 @@ def k_means(data, seed=1, save_dir=""):
         print("make pickle file")
         pickle.dump(centers, f, -1)
 
-    return centers
+    return masks
 
 
 if __name__ == "__main__":
-    _data = load()
-    train_images = _data["train_images"]/255.
-    train_labels = _data["train_labels"]
+    mnist = False
+
+    if mnist:
+        _data = load()
+        train_data = _data["train_images"]/255.
+        train_labels = _data["train_labels"]
+        _k = 10
+    else:
+        _data = load_iris()
+        train_data = _data["data"]
+        print(train_data)
+        train_labels = _data["target"]
+        print(train_labels)
+        _k = 3
 
     _scores_df = pd.DataFrame()
     for _seed in range(100):
         print("seed: ", _seed)
         _file_path = os.path.dirname(os.path.abspath(__file__))
-        _save_dir = _file_path + "/data/seed_" + str(_seed)
+        if mnist:
+            _save_dir = _file_path + "/data/seed_" + str(_seed)
+        else:
+            _save_dir = _file_path + "/data_iris/seed_" + str(_seed)
 
-        _centers = k_means(train_images, seed=_seed, save_dir=_save_dir)
-        draw_heatmap(train_images, train_labels, _centers, seed=_seed, save_dir=_save_dir)
-        _score = entropy_score(train_images, train_labels, _centers)
+        _masks = k_means(train_data, seed=_seed, save_dir=_save_dir, k=_k)
+
+        draw_heatmap(train_labels, _masks, seed=_seed, save_dir=_save_dir, k=_k)
+        _score = entropy_score(train_labels, _masks, k=_k)
         _score_df = pd.DataFrame({
             'seed': [_seed],
             'score': [_score]
         })
         _scores_df = _scores_df.append(_score_df)
-        _scores_df.to_csv(_file_path + "/data/score.csv")
+        if mnist:
+            _scores_df.to_csv(_file_path + "/data/score.csv")
+        else:
+            _scores_df.to_csv(_file_path + "/data_iris/score_iris.csv")
